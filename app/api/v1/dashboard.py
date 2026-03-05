@@ -44,22 +44,22 @@ async def get_dashboard(db: DbSession, current_user: CurrentUser):
     )
     revenue_ytd = float(result.scalar() or 0)
 
-    # Upcoming jobs (next 7 days)
+    # Upcoming jobs (next 7 days) — scheduled_date is VARCHAR, use ISO strings
     from datetime import timedelta
-    end_date = today + timedelta(days=7)
+    end_date = (today + timedelta(days=7)).isoformat()
     result = await db.execute(
         select(func.count(Job.id))
-        .where(Job.scheduled_date >= today)
+        .where(Job.scheduled_date >= today.isoformat())
         .where(Job.scheduled_date <= end_date)
         .where(Job.status.in_(["pending", "scheduled"]))
     )
     upcoming_jobs = result.scalar() or 0
 
-    # Overdue invoices
+    # Overdue invoices — due_date is VARCHAR, use ISO string
     result = await db.execute(
         select(func.count(Invoice.id))
         .where(Invoice.status == "sent")
-        .where(Invoice.due_date < today)
+        .where(Invoice.due_date < today.isoformat())
     )
     overdue_invoices = result.scalar() or 0
 
