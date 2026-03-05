@@ -1,0 +1,1 @@
+{"build":{"builder":"DOCKERFILE"},"deploy":{"healthcheckPath":"/ping","restartPolicyType":"ON_FAILURE"}}
