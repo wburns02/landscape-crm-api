@@ -41,17 +41,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — build origins list, stripping trailing slashes
+_origins = [
+    settings.FRONTEND_URL.rstrip("/"),
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+# Filter out empty strings
+_origins = [o for o in _origins if o]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.FRONTEND_URL,
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # GZip
@@ -98,4 +103,9 @@ app.include_router(seed_router, prefix=PREFIX)
 
 @app.get("/ping")
 async def health_check():
-    return {"status": "healthy", "service": "GreenScape CRM API", "version": "1.0.0"}
+    return {
+        "status": "healthy",
+        "service": "GreenScape CRM API",
+        "version": "1.0.0",
+        "cors_origins": _origins,
+    }
