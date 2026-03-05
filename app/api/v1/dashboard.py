@@ -29,27 +29,27 @@ async def get_dashboard(db: DbSession, current_user: CurrentUser):
 
     # Revenue MTD
     today = date.today()
-    mtd_start = date(today.year, today.month, 1).isoformat()
+    mtd_start = date(today.year, today.month, 1)
     result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(Payment.paid_at >= mtd_start)
+        .where(Payment.paid_at >= datetime(mtd_start.year, mtd_start.month, mtd_start.day, tzinfo=timezone.utc))
     )
     revenue_mtd = float(result.scalar() or 0)
 
     # Revenue YTD
-    ytd_start = date(today.year, 1, 1).isoformat()
+    ytd_start = date(today.year, 1, 1)
     result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(Payment.paid_at >= ytd_start)
+        .where(Payment.paid_at >= datetime(ytd_start.year, ytd_start.month, ytd_start.day, tzinfo=timezone.utc))
     )
     revenue_ytd = float(result.scalar() or 0)
 
     # Upcoming jobs (next 7 days)
     from datetime import timedelta
-    end_date = (today + timedelta(days=7)).isoformat()
+    end_date = today + timedelta(days=7)
     result = await db.execute(
         select(func.count(Job.id))
-        .where(Job.scheduled_date >= today.isoformat())
+        .where(Job.scheduled_date >= today)
         .where(Job.scheduled_date <= end_date)
         .where(Job.status.in_(["pending", "scheduled"]))
     )
@@ -59,7 +59,7 @@ async def get_dashboard(db: DbSession, current_user: CurrentUser):
     result = await db.execute(
         select(func.count(Invoice.id))
         .where(Invoice.status == "sent")
-        .where(Invoice.due_date < today.isoformat())
+        .where(Invoice.due_date < today)
     )
     overdue_invoices = result.scalar() or 0
 
@@ -74,7 +74,7 @@ async def get_dashboard(db: DbSession, current_user: CurrentUser):
     # Crew utilization (% of logged hours vs 8hr workday * workdays this month)
     result = await db.execute(
         select(func.coalesce(func.sum(TimeEntry.hours), 0))
-        .where(TimeEntry.clock_in >= mtd_start)
+        .where(TimeEntry.clock_in >= datetime(mtd_start.year, mtd_start.month, mtd_start.day, tzinfo=timezone.utc))
     )
     total_hours = float(result.scalar() or 0)
     workdays_so_far = max(sum(1 for d in range(1, today.day + 1) if date(today.year, today.month, d).weekday() < 5), 1)
