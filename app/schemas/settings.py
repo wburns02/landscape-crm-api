@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -14,7 +15,7 @@ class SettingsBase(BaseModel):
     default_payment_terms_days: int = 30
     business_hours: dict | None = None
     service_area: dict | None = None
-    pricing_templates: dict | None = None
+    pricing_templates: Any | None = None
 
 
 class SettingsUpdate(BaseModel):
@@ -27,7 +28,7 @@ class SettingsUpdate(BaseModel):
     default_payment_terms_days: int | None = None
     business_hours: dict | None = None
     service_area: dict | None = None
-    pricing_templates: dict | None = None
+    pricing_templates: Any | None = None
 
 
 class SettingsResponse(SettingsBase):
