@@ -1,1 +1,1 @@
-web: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers
+web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers
