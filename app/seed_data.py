@@ -222,7 +222,7 @@ async def seed(db: AsyncSession):
             id=uuid.uuid4(), name=inv[0], category=inv[1], sku=inv[2],
             description=inv[3], unit=inv[4], quantity_on_hand=inv[5],
             reorder_level=inv[6], unit_cost=inv[7], unit_price=inv[8],
-            supplier_name=inv[9], location=inv[11],
+            supplier_name=inv[9], location=inv[10],
         )
         inventory_items.append(item)
     db.add_all(inventory_items)
