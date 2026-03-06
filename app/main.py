@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -47,6 +48,10 @@ _origins = [
     "http://localhost:5173",
     "http://localhost:3000",
 ]
+# Add extra CORS origins (comma-separated) if set
+_extra = os.environ.get("EXTRA_CORS_ORIGINS", "")
+if _extra:
+    _origins.extend(o.strip().rstrip("/") for o in _extra.split(",") if o.strip())
 # Filter out empty strings
 _origins = [o for o in _origins if o]
 
