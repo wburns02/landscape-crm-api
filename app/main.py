@@ -17,6 +17,8 @@ async def lifespan(app: FastAPI):
         Crew,
         CrewMember,
         Customer,
+        DirectMailCampaign,
+        DirectMailRecipient,
         EmailCampaign,
         EmailCampaignRecipient,
         EmailSend,
@@ -26,6 +28,7 @@ async def lifespan(app: FastAPI):
         Invoice,
         Job,
         Lead,
+        MailTemplate,
         Payment,
         Photo,
         Prospect,
@@ -93,6 +96,7 @@ from app.api.v1.email import router as email_router
 from app.api.v1.seed import router as seed_router
 from app.api.v1.settings_routes import router as settings_router
 from app.api.v1.time_entries import router as time_entries_router
+from app.api.v1.direct_mail import router as direct_mail_router
 
 PREFIX = "/api/v1"
 app.include_router(auth_router, prefix=PREFIX)
@@ -113,6 +117,7 @@ app.include_router(reports_router, prefix=PREFIX)
 app.include_router(prospects_router, prefix=PREFIX)
 app.include_router(email_router, prefix=PREFIX)
 app.include_router(settings_router, prefix=PREFIX)
+app.include_router(direct_mail_router, prefix=PREFIX)
 app.include_router(seed_router, prefix=PREFIX)
 
 

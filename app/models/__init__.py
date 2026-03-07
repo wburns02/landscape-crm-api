@@ -15,6 +15,7 @@ from app.models.photo import Photo
 from app.models.settings import SystemSettings
 from app.models.prospect import Prospect
 from app.models.email_campaign import EmailTemplate, EmailCampaign, EmailCampaignRecipient, EmailSend
+from app.models.direct_mail import MailTemplate, DirectMailCampaign, DirectMailRecipient
 
 __all__ = [
     "User",
@@ -38,4 +39,7 @@ __all__ = [
     "EmailCampaign",
     "EmailCampaignRecipient",
     "EmailSend",
+    "MailTemplate",
+    "DirectMailCampaign",
+    "DirectMailRecipient",
 ]
