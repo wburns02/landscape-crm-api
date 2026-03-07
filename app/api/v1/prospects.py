@@ -1,8 +1,9 @@
 import csv
+import io
 import uuid as uuid_mod
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, File, Query, UploadFile
 from sqlalchemy import func, select, text
 
 from app.api.deps import CurrentUser, DbSession
@@ -235,7 +236,11 @@ async def convert_to_lead(prospect_id: UUID, db: DbSession, current_user: Curren
 
 
 @router.post("/import", response_model=ImportResult)
-async def import_prospects(db: DbSession, current_user: CurrentUser):
+async def import_prospects(
+    db: DbSession,
+    current_user: CurrentUser,
+    file: UploadFile | None = File(None),
+):
     batch_id = f"austin_import_{uuid_mod.uuid4().hex[:8]}"
     imported = 0
     skipped = 0
@@ -243,132 +248,109 @@ async def import_prospects(db: DbSession, current_user: CurrentUser):
     total = 0
 
     try:
-        with open(CSV_PATH, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            batch = []
-            for row in reader:
-                state = (row.get("state") or "").strip().upper()
-                city_raw = (row.get("city") or "").strip()
-                city_lower = city_raw.lower()
-                source_city = (row.get("source_city") or "").strip().lower()
+        if file:
+            content = await file.read()
+            reader = csv.DictReader(io.StringIO(content.decode("utf-8")))
+        else:
+            reader = csv.DictReader(open(CSV_PATH, "r", encoding="utf-8"))
 
-                if state != "TX":
-                    continue
-                if city_lower not in AUSTIN_METRO_CITIES and "austin" not in source_city:
-                    continue
+        insert_stmt = text("""
+            INSERT INTO prospects (id, first_name, last_name, full_name, phone, phone_2, email,
+                address, city, state, zip_code, property_value, sqft, year_built, work_type,
+                lead_score, source, import_batch, status, email_status, notes)
+            VALUES (:id, :first_name, :last_name, :full_name, :phone, :phone_2, :email,
+                :address, :city, :state, :zip_code, :property_value, :sqft, :year_built, :work_type,
+                :lead_score, :source, :import_batch, :status, :email_status, :notes)
+            ON CONFLICT (address, city, state) DO NOTHING
+        """)
 
-                owner_name = (row.get("owner_name") or "").strip()
-                address = (row.get("address") or "").strip()
-                phone = (row.get("owner_phone") or "").strip()
+        batch = []
+        for row in reader:
+            state = (row.get("state") or "").strip().upper()
+            city_raw = (row.get("city") or "").strip()
+            city_lower = city_raw.lower()
+            source_city = (row.get("source_city") or "").strip().lower()
 
-                if not (owner_name and address and phone):
-                    skipped += 1
-                    continue
+            if state != "TX":
+                continue
+            if city_lower not in AUSTIN_METRO_CITIES and "austin" not in source_city:
+                continue
 
-                total += 1
+            owner_name = (row.get("owner_name") or "").strip()
+            address = (row.get("address") or "").strip()
+            phone = (row.get("owner_phone") or "").strip()
 
-                # Split name
-                parts = owner_name.split(None, 1)
-                first_name = parts[0] if parts else owner_name
-                last_name = parts[1] if len(parts) > 1 else ""
+            if not (owner_name and address and phone):
+                skipped += 1
+                continue
 
-                # Parse numeric fields
-                prop_val = None
+            total += 1
+
+            parts = owner_name.split(None, 1)
+            first_name = parts[0] if parts else owner_name
+            last_name = parts[1] if len(parts) > 1 else ""
+
+            def parse_float(val):
                 try:
-                    pv = row.get("property_value", "")
-                    if pv:
-                        prop_val = float(pv)
+                    return float(val) if val else None
                 except (ValueError, TypeError):
-                    pass
+                    return None
 
-                sqft_val = None
+            def parse_int(val):
                 try:
-                    sq = row.get("sqft", "")
-                    if sq:
-                        sqft_val = int(float(sq))
+                    return int(float(val)) if val else None
                 except (ValueError, TypeError):
-                    pass
+                    return None
 
-                year_val = None
-                try:
-                    yb = row.get("year_built", "")
-                    if yb:
-                        year_val = int(float(yb))
-                except (ValueError, TypeError):
-                    pass
+            batch.append({
+                "id": uuid_mod.uuid4(),
+                "first_name": first_name[:100],
+                "last_name": last_name[:100],
+                "full_name": owner_name[:200],
+                "phone": phone[:50],
+                "phone_2": (row.get("owner_phone_2") or "")[:50] or None,
+                "email": (row.get("owner_email") or "")[:255] or None,
+                "address": address[:500],
+                "city": city_raw[:100] or None,
+                "state": "TX",
+                "zip_code": (row.get("zip_code") or "")[:20] or None,
+                "property_value": parse_float(row.get("property_value", "")),
+                "sqft": parse_int(row.get("sqft", "")),
+                "year_built": parse_int(row.get("year_built", "")),
+                "work_type": (row.get("work_type") or "")[:100] or None,
+                "lead_score": parse_int(row.get("lead_score", "")),
+                "source": (row.get("source_city") or "csv_import")[:100],
+                "import_batch": batch_id,
+                "status": "new",
+                "email_status": "valid" if row.get("owner_email") else "unknown",
+                "notes": (row.get("description") or "")[:1000] or None,
+            })
 
-                score_val = None
-                try:
-                    ls = row.get("lead_score", "")
-                    if ls:
-                        score_val = int(float(ls))
-                except (ValueError, TypeError):
-                    pass
+            if len(batch) >= 1000:
+                result = await db.execute(insert_stmt, batch)
+                imported += len(batch)
+                batch = []
 
-                batch.append({
-                    "id": uuid_mod.uuid4(),
-                    "first_name": first_name[:100],
-                    "last_name": last_name[:100],
-                    "full_name": owner_name[:200],
-                    "phone": phone[:50],
-                    "phone_2": (row.get("owner_phone_2") or "")[:50] or None,
-                    "email": (row.get("owner_email") or "")[:255] or None,
-                    "address": address[:500],
-                    "city": city_raw[:100] or None,
-                    "state": "TX",
-                    "zip_code": (row.get("zip_code") or "")[:20] or None,
-                    "property_value": prop_val,
-                    "sqft": sqft_val,
-                    "year_built": year_val,
-                    "work_type": (row.get("work_type") or "")[:100] or None,
-                    "lead_score": score_val,
-                    "source": (row.get("source_city") or "csv_import")[:100],
-                    "import_batch": batch_id,
-                    "status": "new",
-                    "email_status": "valid" if row.get("owner_email") else "unknown",
-                    "notes": (row.get("description") or "")[:1000] or None,
-                })
-
-                if len(batch) >= 1000:
-                    stmt = text("""
-                        INSERT INTO prospects (id, first_name, last_name, full_name, phone, phone_2, email,
-                            address, city, state, zip_code, property_value, sqft, year_built, work_type,
-                            lead_score, source, import_batch, status, email_status, notes)
-                        VALUES (:id, :first_name, :last_name, :full_name, :phone, :phone_2, :email,
-                            :address, :city, :state, :zip_code, :property_value, :sqft, :year_built, :work_type,
-                            :lead_score, :source, :import_batch, :status, :email_status, :notes)
-                        ON CONFLICT (address, city, state) DO NOTHING
-                    """)
-                    result = await db.execute(stmt, batch)
-                    imported += result.rowcount
-                    skipped += len(batch) - result.rowcount
-                    batch = []
-
-            # Final batch
-            if batch:
-                stmt = text("""
-                    INSERT INTO prospects (id, first_name, last_name, full_name, phone, phone_2, email,
-                        address, city, state, zip_code, property_value, sqft, year_built, work_type,
-                        lead_score, source, import_batch, status, email_status, notes)
-                    VALUES (:id, :first_name, :last_name, :full_name, :phone, :phone_2, :email,
-                        :address, :city, :state, :zip_code, :property_value, :sqft, :year_built, :work_type,
-                        :lead_score, :source, :import_batch, :status, :email_status, :notes)
-                    ON CONFLICT (address, city, state) DO NOTHING
-                """)
-                result = await db.execute(stmt, batch)
-                imported += result.rowcount
-                skipped += len(batch) - result.rowcount
+        if batch:
+            result = await db.execute(insert_stmt, batch)
+            imported += len(batch)
 
         await db.commit()
+
+        # Get actual count from DB
+        count_result = await db.execute(
+            select(func.count()).select_from(Prospect).where(Prospect.import_batch == batch_id)
+        )
+        actual_imported = count_result.scalar() or 0
+
     except FileNotFoundError:
         raise ValidationError(f"CSV file not found at {CSV_PATH}")
     except Exception as e:
-        errors += 1
         raise ValidationError(f"Import error: {str(e)}")
 
     return ImportResult(
-        imported=imported,
-        skipped=skipped,
+        imported=actual_imported,
+        skipped=total - actual_imported,
         errors=errors,
         total_processed=total,
         batch_id=batch_id,
