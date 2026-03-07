@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class CustomerBase(BaseModel):
@@ -58,5 +59,19 @@ class CustomerResponse(CustomerBase):
     job_count: int
     created_at: datetime
     updated_at: datetime
+    # Frontend-compatible aliases
+    name: str = ""
+    type: str = ""
+    zip: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def populate_aliases(self) -> "CustomerResponse":
+        if not self.name:
+            self.name = self.company_name or f"{self.first_name} {self.last_name}".strip()
+        if not self.type:
+            self.type = self.customer_type
+        if self.zip is None:
+            self.zip = self.zip_code
+        return self

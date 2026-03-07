@@ -13,6 +13,8 @@ from app.models.time_entry import TimeEntry
 from app.models.lead import Lead
 from app.models.photo import Photo
 from app.models.settings import SystemSettings
+from app.models.prospect import Prospect
+from app.models.email_campaign import EmailTemplate, EmailCampaign, EmailCampaignRecipient, EmailSend
 
 __all__ = [
     "User",
@@ -31,4 +33,9 @@ __all__ = [
     "Lead",
     "Photo",
     "SystemSettings",
+    "Prospect",
+    "EmailTemplate",
+    "EmailCampaign",
+    "EmailCampaignRecipient",
+    "EmailSend",
 ]

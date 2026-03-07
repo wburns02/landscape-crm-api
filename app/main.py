@@ -17,6 +17,10 @@ async def lifespan(app: FastAPI):
         Crew,
         CrewMember,
         Customer,
+        EmailCampaign,
+        EmailCampaignRecipient,
+        EmailSend,
+        EmailTemplate,
         Equipment,
         InventoryItem,
         Invoice,
@@ -24,6 +28,7 @@ async def lifespan(app: FastAPI):
         Lead,
         Payment,
         Photo,
+        Prospect,
         ScheduleEvent,
         SystemSettings,
         TimeEntry,
@@ -46,6 +51,7 @@ app = FastAPI(
 _origins = [
     settings.FRONTEND_URL.rstrip("/"),
     "http://localhost:5173",
+    "http://localhost:5176",
     "http://localhost:3000",
 ]
 # Add extra CORS origins (comma-separated) if set
@@ -82,6 +88,8 @@ from app.api.v1.photos import router as photos_router
 from app.api.v1.quotes import router as quotes_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.schedule import router as schedule_router
+from app.api.v1.prospects import router as prospects_router
+from app.api.v1.email import router as email_router
 from app.api.v1.seed import router as seed_router
 from app.api.v1.settings_routes import router as settings_router
 from app.api.v1.time_entries import router as time_entries_router
@@ -102,6 +110,8 @@ app.include_router(leads_router, prefix=PREFIX)
 app.include_router(photos_router, prefix=PREFIX)
 app.include_router(dashboard_router, prefix=PREFIX)
 app.include_router(reports_router, prefix=PREFIX)
+app.include_router(prospects_router, prefix=PREFIX)
+app.include_router(email_router, prefix=PREFIX)
 app.include_router(settings_router, prefix=PREFIX)
 app.include_router(seed_router, prefix=PREFIX)
 
